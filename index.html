@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>루프 타이밍 비교 (5개씩 페이지)</title>
+
+<style>
+body {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #111;
+  color: #eee;
+  margin: 0;
+  padding: 20px;
+}
+
+h1 { font-size: 20px; margin-bottom: 8px; }
+h2 { font-size: 16px; margin: 24px 0 12px; color: #8ecfff; }
+
+.controls {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+  align-items: center;
+}
+
+.controls label {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.controls input {
+  width: 80px;
+  padding: 4px;
+  background: #222;
+  border: 1px solid #444;
+  color: #eee;
+  border-radius: 4px;
+}
+
+button {
+  padding: 6px 14px;
+  background: #4fc3f7;
+  color: #000;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+button:hover { background: #81d4fa; }
+
+button:disabled {
+  background: #555;
+  cursor: default;
+}
+
+.page-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin: 8px 0 16px;
+}
+
+.page-info {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+}
+
+.cell {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 8px;
+  background: #181818;
+}
+
+.label {
+  font-size: 12px;
+  margin-bottom: 4px;
+  text-align: center;
+  opacity: 0.8;
+}
+
+.box {
+  position: relative;
+  width: 100%;
+  height: 80px;
+  background: #222;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.ball {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #4fc3f7;
+  animation-iteration-count: infinite;
+}
+
+.pingpong {
+  animation-name: pingpong;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes pingpong {
+  0%   { top: 4px; }
+  50%  { top: 60px; }
+  100% { top: 4px; }
+}
+
+.saw {
+  animation-name: saw;
+  animation-timing-function: linear;
+}
+
+@keyframes saw {
+  0%   { top: 4px; }
+  99%  { top: 60px; }
+  100% { top: 4px; }
+}
+</style>
+</head>
+
+<body>
+
+<h1>루프 타이밍 비교 (5개씩 페이지 이동)</h1>
+
+<div class="controls">
+  <label>
+    최대 시간 (초)
+    <input type="number" id="maxTime" value="3" step="0.1" min="0.1">
+  </label>
+
+  <label>
+    간격 (초)
+    <input type="number" id="stepTime" value="0.05" step="0.01" min="0.01">
+  </label>
+
+  <button id="applyBtn">적용</button>
+</div>
+
+<div class="page-controls">
+  <button id="prevBtn">이전</button>
+  <div class="page-info" id="pageInfo"></div>
+  <button id="nextBtn">다음</button>
+</div>
+
+<h2>왕복 운동 (0 → 1 → 0)</h2>
+<div class="grid" id="gridPingpong"></div>
+
+<h2>비왕복 / 나머지 연산형 (0 → 1 → 즉시 0)</h2>
+<div class="grid" id="gridSaw"></div>
+
+<script>
+const gridPingpong = document.getElementById("gridPingpong");
+const gridSaw = document.getElementById("gridSaw");
+
+const maxTimeInput = document.getElementById("maxTime");
+const stepTimeInput = document.getElementById("stepTime");
+const applyBtn = document.getElementById("applyBtn");
+
+const prevBtn = document.getElementById("prevBtn");
+const nextBtn = document.getElementById("nextBtn");
+const pageInfo = document.getElementById("pageInfo");
+
+let durations = [];
+let currentPage = 0;
+const pageSize = 5;
+
+function createCell(duration, type) {
+  const cell = document.createElement("div");
+  cell.className = "cell";
+
+  const label = document.createElement("div");
+  label.className = "label";
+  label.textContent = duration.toFixed(2) + "초";
+
+  const box = document.createElement("div");
+  box.className = "box";
+
+  const ball = document.createElement("div");
+  ball.className = `ball ${type}`;
+  ball.style.animationDuration = duration + "s";
+
+  box.appendChild(ball);
+  cell.appendChild(label);
+  cell.appendChild(box);
+
+  return cell;
+}
+
+function renderPage() {
+  gridPingpong.innerHTML = "";
+  gridSaw.innerHTML = "";
+
+  const start = currentPage * pageSize;
+  const end = start + pageSize;
+  const slice = durations.slice(start, end);
+
+  slice.forEach(d => {
+    gridPingpong.appendChild(createCell(d, "pingpong"));
+    gridSaw.appendChild(createCell(d, "saw"));
+  });
+
+  const totalPages = Math.ceil(durations.length / pageSize);
+  pageInfo.textContent = `페이지 ${currentPage + 1} / ${totalPages}`;
+
+  prevBtn.disabled = currentPage === 0;
+  nextBtn.disabled = currentPage >= totalPages - 1;
+}
+
+function rebuild() {
+  const maxTime = parseFloat(maxTimeInput.value);
+  const step = parseFloat(stepTimeInput.value);
+
+  if (isNaN(maxTime) || isNaN(step) || maxTime <= 0 || step <= 0) {
+    alert("올바른 값을 입력하세요");
+    return;
+  }
+
+  durations = [];
+  const count = Math.floor(maxTime / step);
+
+  for (let i = 1; i <= count; i++) {
+    durations.push(i * step);
+  }
+
+  currentPage = 0;
+  renderPage();
+}
+
+applyBtn.addEventListener("click", rebuild);
+
+prevBtn.addEventListener("click", () => {
+  if (currentPage > 0) {
+    currentPage--;
+    renderPage();
+  }
+});
+
+nextBtn.addEventListener("click", () => {
+  const maxPage = Math.ceil(durations.length / pageSize) - 1;
+  if (currentPage < maxPage) {
+    currentPage++;
+    renderPage();
+  }
+});
+
+// 초기 생성
+rebuild();
+</script>
+
+</body>
+</html>
